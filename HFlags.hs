@@ -160,7 +160,7 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
                                               moduleName
                                               (evaluate $(varE accessorName) >> return ())
                                            |]) []]]
-     flagPragmaDec <- return $ PragmaD $ InlineP accessorName $ InlineSpec False False Nothing
+     flagPragmaDec <- return $ PragmaD $ InlineP accessorName NoInline FunLike AllPhases
      flagDec <- funD accessorName [clause [] (normalB [| case True of
                                                            True -> $(appE readQ [| lookupFlag name moduleName |])
                                                            False -> $(defQ) |]) []]
