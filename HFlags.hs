@@ -83,6 +83,7 @@ import Data.IORef
 import Data.Maybe
 import qualified Data.Map as Map
 import Data.Map (Map, (!))
+import qualified Data.Text
 import Language.Haskell.TH
 import System.Console.GetOpt
 import System.Environment
@@ -226,6 +227,11 @@ instance FlagType String where
 
 instance FlagType Double where
   defineFlag n v = defineEQFlag n (sigE (litE (RationalL (toRational v))) [t| Double |] ) "DOUBLE"
+
+instance FlagType Data.Text.Text where
+  defineFlag n v =
+    let s = Data.Text.unpack v
+    in defineCustomFlag n [| Data.Text.pack s :: Data.Text.Text |] "TEXT" [| Data.Text.pack |] [| Data.Text.unpack |]
 
 -- | A global "IORef" for the communication between @initHFlags@ and
 -- @flag_*@.  This is a map between flag name and current value.
