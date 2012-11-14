@@ -90,7 +90,7 @@ import System.IO
 import System.IO.Unsafe
 import System.Exit
 
-import Prelude hiding (catch)
+import Prelude
 
 -- | Data type for storing every property of a flag.
 data FlagData = FlagData
