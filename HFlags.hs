@@ -65,7 +65,7 @@
 module HFlags (
   -- * Definition of flags
   defineCustomFlag,
-  defineQQFlag,
+  defineEQFlag,
   FlagType(..),
   -- * Initialization of flags at runtime
   initHFlags) where
@@ -121,13 +121,13 @@ class Flag a where
 --
 --   * name of the flag (@l:long@ syntax if you want to have the short option @l@ for this flag),
 --
---   * quasiquoted and type signed default value,
+--   * expression quoted and type signed default value,
 --
 --   * help string for the argument,
 --
---   * read function, quasiquoted,
+--   * read function, expression quoted,
 --
---   * show function, quasiquoted,
+--   * show function, expression quoted,
 --
 --   * help string for the flag.
 defineCustomFlag :: String -> ExpQ -> String -> ExpQ -> ExpQ -> String -> Q [Dec]
@@ -173,15 +173,15 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
 --
 -- The parameters:
 --
---   * name of the flag (@l:long@ syntax if you want to have the short option @l@ for this flag),,
+--   * name of the flag (@l:long@ syntax if you want to have the short option @l@ for this flag),
 --
---   * quasiquoted and type signed default value,
+--   * expression quoted and type signed default value,
 --
 --   * help string for the argument,
 --
 --   * help string for the flag.
-defineQQFlag :: String -> ExpQ -> String -> String -> Q [Dec]
-defineQQFlag name defQ argHelp description =
+defineEQFlag :: String -> ExpQ -> String -> String -> Q [Dec]
+defineEQFlag name defQ argHelp description =
  defineCustomFlag name defQ argHelp [| read |] [| show |] description
 
 -- | Class of types for which the easy 'defineFlag' syntax is supported.
@@ -216,16 +216,16 @@ instance FlagType Bool where
   defineFlag n v = defineCustomFlag n [| v :: Bool |] "BOOL" [| boolRead |] [| boolShow |]
 
 instance FlagType Int where
-  defineFlag n v = defineQQFlag n [| v :: Int |] "INT"
+  defineFlag n v = defineEQFlag n [| v :: Int |] "INT"
 
 instance FlagType Integer where
-  defineFlag n v = defineQQFlag n [| v :: Integer |] "INTEGER"
+  defineFlag n v = defineEQFlag n [| v :: Integer |] "INTEGER"
 
 instance FlagType String where
   defineFlag n v = defineCustomFlag n [| v :: String |] "STRING" [| id |] [| id |]
 
 instance FlagType Double where
-  defineFlag n v = defineQQFlag n (sigE (litE (RationalL (toRational v))) [t| Double |] ) "DOUBLE"
+  defineFlag n v = defineEQFlag n (sigE (litE (RationalL (toRational v))) [t| Double |] ) "DOUBLE"
 
 -- | A global "IORef" for the communication between @initHFlags@ and
 -- @flag_*@.  This is a map between flag name and current value.

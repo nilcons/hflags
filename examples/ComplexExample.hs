@@ -1,5 +1,5 @@
 #!/usr/bin/env runhaskell
-  
+
 {-# LANGUAGE TemplateHaskell #-}
 
 import Control.Monad
@@ -21,27 +21,27 @@ defineFlag "repeat" (3 + 4 :: Int) "Number of times to repeat the message."
 
 -- For flags with a more complex type, where the existing Read and
 -- Show is suitable for parsing of the argument value, you can use the
--- defineQQFlag syntax.  Here, the QQ is mnemonic for QuasiQuoter,
--- because you have to quasiquote the default value, and type sign it
--- inside the quasiquote.  Also, you have to provide the name of the
+-- defineEQFlag syntax.  Here, the EQ is mnemonic for expression
+-- quotes, because you have to expression quote the default value, and
+-- type sign it inside.  Also, you have to provide the name of the
 -- type for --help generation.
-defineQQFlag "numbers_to_sum" [| [1,2,3,4,5] :: [Int] |] "INT_LIST" "Print the sum of these numbers."
+defineEQFlag "numbers_to_sum" [| [1,2,3,4,5] :: [Int] |] "INT_LIST" "Print the sum of these numbers."
 
 -- This works quite well for simple enums too!
 data Color = Red | Yellow | Green deriving (Show, Read)
-defineQQFlag "favorite_color" [| Yellow :: Color |] "COLOR" "Your favorite color."
+defineEQFlag "favorite_color" [| Yellow :: Color |] "COLOR" "Your favorite color."
 
 -- Sometimes the default read or show instance is not good enough for
 -- your needs.  In that case you can use defineCustomFlag to override
 -- those functions.
 data Language = English | Hungarian
 defineCustomFlag "language" [| English :: Language |] "en|hu"
-  [| \s -> case s of 
+  [| \s -> case s of
       "en" -> English
       "hu" -> Hungarian
       _ -> error $ "Unknown language: " ++ s
    |]
-  [| \l -> case l of 
+  [| \l -> case l of
       English -> "en"
       Hungarian -> "hu"
    |]
