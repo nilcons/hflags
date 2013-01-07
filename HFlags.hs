@@ -143,6 +143,7 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
      case defE of
        SigE _ _ -> return ()
        _ -> fail "Default value for defineCustomFlag has to be an explicitly typed expression, like (12 :: Int)"
+     let SigE _ flagType = defE
      moduleName <- fmap loc_module location
      let accessorName = mkName $ "flags_" ++ name
      let dataName = mkName $ "HFlag_" ++ name
@@ -162,10 +163,11 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
                                               (evaluate $(varE accessorName) >> return ())
                                            |]) []]]
      flagPragmaDec <- return $ PragmaD $ InlineP accessorName NoInline FunLike AllPhases
+     let flagSig = SigD accessorName flagType
      flagDec <- funD accessorName [clause [] (normalB [| case True of
                                                            True -> $(appE readQ [| lookupFlag name moduleName |])
                                                            False -> $(defQ) |]) []]
-     return [dataDec, instanceDec, flagPragmaDec, flagDec]
+     return [dataDec, instanceDec, flagPragmaDec, flagSig, flagDec]
 
 -- | This just forwards to 'defineCustomFlag' with @[| read |]@ and
 -- @[| show |]@.  Useful for flags where the type is not an instance
