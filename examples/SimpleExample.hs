@@ -9,5 +9,6 @@ defineFlag "repeat" (3 + 4 :: Int) "Number of times to repeat the message."
 
 main = do s <- $(initHFlags "Simple program v0.1")
           sequence_ $ replicate flags_repeat greet
+          putStrLn $ "Your additional arguments were: " ++ show s
   where
     greet = putStrLn $ "Hello " ++ flags_name ++ ", very nice to meet you!"
