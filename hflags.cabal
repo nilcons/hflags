@@ -44,6 +44,8 @@ description:
   .
   main = do s <- $(initHFlags \"Simple program v0.1\")
   &#x20;         sequence_ $ replicate flags_repeat greet
+  &#x20;         putStrLn $ \"Your additional arguments were: \" ++ show s
+  &#x20;         putStrLn $ \"Which is the same as: \" ++ show HFlags.arguments
   &#x20; where
   &#x20;   greet = putStrLn $ \"Hello \" ++ flags_name ++ \", very nice to meet you!\"
   @

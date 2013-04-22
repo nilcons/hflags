@@ -54,6 +54,8 @@
 -- >
 -- > main = do s <- $(initHFlags "Simple program v0.1")
 -- >           sequence_ $ replicate flags_repeat greet
+-- >           putStrLn $ "Your additional arguments were: " ++ show s
+-- >           putStrLn $ "Which is the same as: " ++ show HFlags.arguments
 -- >   where
 -- >     greet = putStrLn $ "Hello " ++ flags_name ++ ", very nice to meet you!"
 --
@@ -68,7 +70,10 @@ module HFlags (
   defineEQFlag,
   FlagType(..),
   -- * Initialization of flags at runtime
-  initHFlags) where
+  initHFlags,
+  -- * For easy access to arguments, after initHFlags has been called
+  arguments
+  ) where
 
 -- TODOs:
 -- ?--no* for bools?
@@ -235,10 +240,25 @@ instance FlagType Data.Text.Text where
     in defineCustomFlag n [| Data.Text.pack s :: Data.Text.Text |] "TEXT" [| Data.Text.pack |] [| Data.Text.unpack |]
 
 -- | A global "IORef" for the communication between @initHFlags@ and
--- @flag_*@.  This is a map between flag name and current value.
+-- @flags_*@.  This is a map between flag name and current value.
 {-# NOINLINE globalHFlags #-}
 globalHFlags :: IORef (Maybe (Map String String))
 globalHFlags = unsafePerformIO $ newIORef Nothing
+
+-- | A global "IORef" for the easy access to the arguments.
+{-# NOINLINE globalArguments #-}
+globalArguments :: IORef (Maybe [String])
+globalArguments = unsafePerformIO $ newIORef Nothing
+
+-- | Contains the non-parsed, non-option parts of the command line,
+-- the arguments.  Can only be used after @initHFlags@ has been called.
+{-# NOINLINE arguments #-}
+arguments :: [String]
+arguments = unsafePerformIO $ do
+  margs <- readIORef globalArguments
+  case margs of
+    Just args -> return $ args
+    Nothing -> error $ "HFlags.arguments used before calling initHFlags."
 
 lookupFlag :: String -> String -> String
 lookupFlag fName fModuleName = unsafePerformIO $ do
@@ -260,6 +280,7 @@ initFlags progDescription flags args = do
   env <- getEnvironment
   let envDefaults = map (mapFst (fromJust . stripPrefix "HFLAGS_")) $ filter ((isPrefixOf "HFLAGS_") . fst) env
   writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ envDefaults ++ opts
+  writeIORef globalArguments $ Just nonopts
   mapM_ forceFlag flags
   return nonopts
     where
