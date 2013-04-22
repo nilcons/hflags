@@ -1,4 +1,5 @@
 -- Copyright 2012 Google Inc. All Rights Reserved.
+-- Copyright 2013 and onwards, Gergely Risko
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -12,7 +13,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 --
--- Authors: Mihaly Barasz <klao@google.com>, Gergely Risko <errge@google.com>
+-- Authors: Mihaly Barasz <klao@google.com>, Gergely Risko <gergely@risko.hu>
 
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
