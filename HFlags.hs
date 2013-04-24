@@ -73,7 +73,9 @@ module HFlags (
   -- * Initialization of flags at runtime
   initHFlags,
   -- * For easy access to arguments, after initHFlags has been called
-  arguments
+  arguments,
+  -- * For debugging, shouldn't be used in production code
+  Flag(..)
   ) where
 
 -- TODOs:
@@ -110,6 +112,9 @@ data FlagData = FlagData
             , fCheck :: IO () -- ^ function to evaluate in 'initFlags'
                               -- to force syntax check of the argument.
             }
+
+instance Show FlagData where
+  show fd = show (fName fd, fShort fd, fDefValue fd, fArgHelp fd, fDescription fd, fModuleName fd)
 
 -- | Every flag the program supports has to be defined through a new
 -- phantom datatype and the Flag instance of that datatype.
@@ -237,6 +242,7 @@ instance FlagType Double where
 
 instance FlagType Data.Text.Text where
   defineFlag n v =
+    -- defer lifting of Data.Text.Text to String lifting
     let s = Data.Text.unpack v
     in defineCustomFlag n [| Data.Text.pack s :: Data.Text.Text |] "TEXT" [| Data.Text.pack |] [| Data.Text.unpack |]
 
