@@ -157,7 +157,8 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
      moduleName <- fmap loc_module location
      let accessorName = mkName $ "flags_" ++ name
      let dataName = mkName $ "HFlag_" ++ name
-     dataDec <- return $ DataD [] dataName [] [] []
+     let dataConstrName = mkName $ "HFlagC_" ++ name
+     dataDec <- return $ DataD [] dataName [] [(NormalC dataConstrName [])] []
      instanceDec <- instanceD
                     (return [])
                     (appT (conT ''Flag) (conT dataName))
