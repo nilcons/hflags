@@ -106,7 +106,7 @@ data FlagData = FlagData
             { fName :: String
             , fShort :: Maybe Char
             , fDefValue :: String
-            , fArgHelp :: String
+            , fArgType :: String
             , fDescription :: String
             , fModuleName :: String
             , fCheck :: IO () -- ^ function to evaluate in 'initFlags'
@@ -114,7 +114,7 @@ data FlagData = FlagData
             }
 
 instance Show FlagData where
-  show fd = show (fName fd, fShort fd, fDefValue fd, fArgHelp fd, fDescription fd, fModuleName fd)
+  show fd = show (fName fd, fShort fd, fDefValue fd, fArgType fd, fDescription fd, fModuleName fd)
 
 -- | Every flag the program supports has to be defined through a new
 -- phantom datatype and the Flag instance of that datatype.
@@ -135,7 +135,7 @@ class Flag a where
 --
 --   * expression quoted and type signed default value,
 --
---   * help string for the argument,
+--   * help string identifying the type of the argument (e.g. INTLIST),
 --
 --   * read function, expression quoted,
 --
@@ -191,7 +191,7 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
 --
 --   * expression quoted and type signed default value,
 --
---   * help string for the argument,
+--   * help string identifying the type of the argument (e.g. INTLIST),
 --
 --   * help string for the flag.
 defineEQFlag :: String -> ExpQ -> String -> String -> Q [Dec]
@@ -304,9 +304,9 @@ initFlags progDescription flags args = do
         ([], _, _) -> False
         _ -> True
 
-      flagToGetOptArgDescr FlagData { fName, fArgHelp }
-        | fArgHelp == "BOOL" = OptArg (\a -> (fName, maybe "True" id a)) fArgHelp
-        | otherwise = ReqArg (\a -> (fName, a)) fArgHelp
+      flagToGetOptArgDescr FlagData { fName, fArgType }
+        | fArgType == "BOOL" = OptArg (\a -> (fName, maybe "True" id a)) fArgType
+        | otherwise = ReqArg (\a -> (fName, a)) fArgType
 
       -- compute GetOpt compatible [Option] structure from flags ([FlagData])
       getOptFlags = flip map flags $ \flagData@(FlagData { fName, fShort, fDefValue, fDescription, fModuleName }) ->
