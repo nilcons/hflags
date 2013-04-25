@@ -1,0 +1,19 @@
+name: tup
+version: 0.0.1
+license: GPL
+author: Gergely Risko <gergely@risko.hu>
+build-type: Simple
+cabal-version: >= 1.6
+
+synopsis: tup
+description:
+  tup
+
+library
+  build-depends:
+      base >= 4.6 && < 5
+    , template-haskell >= 2.8
+    , hflags >= 0.1
+
+  exposed-modules:
+    Tup

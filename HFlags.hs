@@ -40,7 +40,8 @@
 -- from @main@.  This means, that any Haskell package can easily
 -- define command line flags with @HFlags@.  This feature is
 -- demonstrated by
--- <http://github.com/errge/hflags/blob/master/examples/ImportExample.hs>.
+-- <http://github.com/errge/hflags/blob/master/examples/ImportExample.hs>
+-- and <http://github.com/errge/hflags/tree/master/examples/package>.
 --
 -- A simple example (more in the
 -- <http://github.com/errge/hflags/tree/master/examples> directory):

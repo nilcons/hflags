@@ -27,7 +27,8 @@ description:
   will be initialized that are transitively reachable via imports from
   @main@.  This means, that any Haskell package can easily define
   command line flags with @HFlags@.  This feature is demonstrated by
-  <http://github.com/errge/hflags/blob/master/examples/ImportExample.hs>.
+  <http://github.com/errge/hflags/blob/master/examples/ImportExample.hs>
+  and <http://github.com/errge/hflags/tree/master/examples/package>.
   .
   A simple example (more in the
   <http://github.com/errge/hflags/tree/master/examples> directory):
@@ -61,6 +62,11 @@ extra-source-files:
   examples/SimpleExample.hs
   examples/X/B.hs
   examples/X/Y_Y/A.hs
+  examples/package/Tup.hs
+  examples/package/test/main.hs
+  examples/package/tup.cabal
+  BLOG.md
+  README.md
 
 source-repository head
   type: git
