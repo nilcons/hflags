@@ -1,3 +1,6 @@
+-- to test collision detection
+-- {-# LANGUAGE TemplateHaskell #-}
+
 module X.B (b) where
 
 import qualified X.Y_Y.A as A

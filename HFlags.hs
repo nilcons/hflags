@@ -19,6 +19,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -- |
 -- Module: HFlags
@@ -79,6 +80,7 @@ module HFlags (
   ) where
 
 -- TODOs:
+-- duplicate checking for short options: it's tricky, we need to encode info in the HFlag_... data name
 -- ?--no* for bools?
 -- --help should show the current value if it's different than the default value, so user can test command line args
 
@@ -144,23 +146,26 @@ class Flag a where
 --   * help string for the flag.
 defineCustomFlag :: String -> ExpQ -> String -> ExpQ -> ExpQ -> String -> Q [Dec]
 defineCustomFlag name' defQ argHelp readQ showQ description =
-  do (name, short) <- case () of
-       () | length name' == 0 -> fail "Flag's without names are not supported."
-          | length name' == 1 -> return (name', Just $ head name')
-          | length name' == 2 -> return (name', Nothing)
-          | name' !! 1 == ':' -> return (drop 2 name', Just $ head name')
-          | otherwise -> return (name', Nothing)
+  do (name, short) <- if | length name' == 0 -> fail "Flag's without names are not supported."
+                         | length name' == 1 -> return (name', Just $ head name')
+                         | length name' == 2 -> return (name', Nothing)
+                         | name' !! 1 == ':' -> return (drop 2 name', Just $ head name')
+                         | otherwise -> return (name', Nothing)
      defE <- defQ
      flagType <- case defE of
-       SigE _ flagType -> return flagType
+       SigE _ flagType -> return $ return flagType
        _ -> fail "Default value for defineCustomFlag has to be an explicitly typed expression, like (12 :: Int)"
      moduleName <- fmap loc_module location
      let accessorName = mkName $ "flags_" ++ name
+     -- attention: formatting of the dataName matters here, initHFlags
+     -- parses the name, so the generation here and the parsing in
+     -- initHFlags has to be consistent.
      let dataName = mkName $ "HFlag_" ++ name
      let dataConstrName = mkName $ "HFlagC_" ++ name
-     dataDec <- return $ DataD [] dataName [] [(NormalC dataConstrName [])] []
+     -- Note: support for splicing inside [d| |] would make all this a lot nicer
+     dataDec <- dataD (cxt []) dataName [] [normalC dataConstrName []] []
      instanceDec <- instanceD
-                    (return [])
+                    (cxt [])
                     (appT (conT ''Flag) (conT dataName))
                       [funD 'getFlagData [clause [wildP]
                                           (normalB
@@ -173,11 +178,9 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
                                               moduleName
                                               (evaluate $(varE accessorName) >> return ())
                                            |]) []]]
-     flagPragmaDec <- return $ PragmaD $ InlineP accessorName NoInline FunLike AllPhases
-     flagSig <- return $ SigD accessorName flagType
-     flagDec <- funD accessorName [clause [] (normalB [| case True of
-                                                           True -> $(appE readQ [| lookupFlag name moduleName |])
-                                                           False -> $(defQ) |]) []]
+     flagPragmaDec <- pragInlD accessorName NoInline FunLike AllPhases
+     flagSig <- sigD accessorName flagType
+     flagDec <- funD accessorName [clause [] (normalB $ appE readQ [| lookupFlag name moduleName |]) []]
      return [dataDec, instanceDec, flagPragmaDec, flagSig, flagDec]
 
 -- | This just forwards to 'defineCustomFlag' with @[| read |]@ and
@@ -241,6 +244,8 @@ instance FlagType String where
 instance FlagType Double where
   defineFlag n v = defineEQFlag n (sigE (litE (RationalL (toRational v))) [t| Double |] ) "DOUBLE"
 
+-- TODO(errge): hflags-instances cabal package, so the base hflags
+-- doesn't depend on text, which is not in GHC.
 instance FlagType Data.Text.Text where
   defineFlag n v =
     -- defer lifting of Data.Text.Text to String lifting
@@ -340,10 +345,14 @@ initHFlags progDescription = do
     [] -> return ()
     (dupe:_) -> fail ("Multiple definition of flag " ++ (snd $ head dupe) ++
                        ", modules: " ++ (show $ map fst dupe))
-  [| getArgs >>= initFlags progDescription $(listE $ map instanceToOptTuple instances ) |]
+  [| getArgs >>= initFlags progDescription $(listE $ map instanceToFlagData instances ) |]
     where
-      instanceToOptTuple (InstanceD _ (AppT _ inst) _) = [| getFlagData (undefined :: $(return inst)) |]
-      instanceToOptTuple _ = error "Shouldn't happen"
+      instanceToFlagData (InstanceD _ (AppT _ inst) _) = [| getFlagData (undefined :: $(return inst)) |]
+      instanceToFlagData _ = error "Shouldn't happen"
+      -- Duplicate checking is based on the generated `data HFlag_...'
+      -- names, and not on FlagData, because we want to do the checks
+      -- at compile time.  It's not possible in TH, to run getFlagData
+      -- on the just reified instances.
       instanceToModuleNamePair (InstanceD _ (AppT _ (ConT inst)) _) =
         let (flagrev, modrev) = span (/= '.') $ reverse $ show inst
             modName = reverse $ drop 1 modrev
