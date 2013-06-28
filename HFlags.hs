@@ -98,8 +98,11 @@ import Data.Function
 import Data.List
 import Data.IORef
 import Data.Maybe
-import qualified Data.Map.Strict as Map
-import Data.Map (Map, (!))
+-- This is intentionally lazy, so dependent defaults are only
+-- evaluated if they are needed.  (The user hasn't specified the
+-- option in the command line or via environment variables.)
+import qualified Data.Map.Lazy as Map
+import Data.Map.Lazy (Map, (!))
 import qualified Data.Text
 import Language.Haskell.TH
 import System.Console.GetOpt
