@@ -58,7 +58,7 @@ defineCustomFlag "percent" [| 100 :: Double |] "PERCENTAGE"
   "Print first percent percentage of the message."
 
 main = do
-  _ <- $(initHFlags "HFlags example program v0.1")
+  _ <- $initHFlags "HFlags example program v0.1"
   when (flags_dry_run) $ exitSuccess
   forM_ [1..flags_repeat] (const greet)
   putStrLn $ "IIRC, your favorite color is " ++ show flags_favorite_color ++ "."

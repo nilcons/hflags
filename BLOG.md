@@ -21,7 +21,7 @@ defineFlag "name" "Indiana Jones" "Who to greet."
 defineFlag "r:repeat" (3 + 4 :: Int)
   "Number of times to repeat the message."
 
-main = do remainingArgs <- $(initHFlags "Simple program v0.1")
+main = do remainingArgs <- $initHFlags "Simple program v0.1"
           sequence_ $ replicate flags_repeat greet
   where
     greet = putStrLn $ "Hello "

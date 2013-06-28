@@ -34,8 +34,8 @@
 -- the toplevel @flags_name@ constants.  Those can be used purely
 -- throughout the program.
 --
--- At the beginning of the @main@ function, @$(initHFlags "program
--- description")@ has to be called to initialize the flags.  All flags
+-- At the beginning of the @main@ function, @$initHFlags "program
+-- description"@ has to be called to initialize the flags.  All flags
 -- will be initialized that are transitively reachable via imports
 -- from @main@.  This means, that any Haskell package can easily
 -- define command line flags with @HFlags@.  This feature is
@@ -55,7 +55,7 @@
 -- > defineFlag "name" "Indiana Jones" "Who to greet."
 -- > defineFlag "r:repeat" (3 + 4 :: Int) "Number of times to repeat the message."
 -- >
--- > main = do s <- $(initHFlags "Simple program v0.1")
+-- > main = do s <- $initHFlags "Simple program v0.1"
 -- >           sequence_ $ replicate flags_repeat greet
 -- >           putStrLn $ "Your additional arguments were: " ++ show s
 -- >           putStrLn $ "Which is the same as: " ++ show HFlags.arguments
@@ -66,6 +66,9 @@
 -- environment variables.  @HFLAGS_verbose=True@ is equivalent to
 -- specify --verbose=True.  This environment feature only works with
 -- long options and the user has to specify a value even for Bools.
+--
+-- /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
+
 
 module HFlags (
   -- * Definition of flags
@@ -74,10 +77,13 @@ module HFlags (
   FlagType(..),
   -- * Initialization of flags at runtime
   initHFlags,
+  initHFlagsDependentDefaults,
   -- * For easy access to arguments, after initHFlags has been called
   arguments,
   -- * For debugging, shouldn't be used in production code
-  Flag(..)
+  Flag(..),
+  globalHFlags,
+  globalArguments
   ) where
 
 -- TODOs:
@@ -92,7 +98,7 @@ import Data.Function
 import Data.List
 import Data.IORef
 import Data.Maybe
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Map (Map, (!))
 import qualified Data.Text
 import Language.Haskell.TH
@@ -281,9 +287,15 @@ lookupFlag fName fModuleName = unsafePerformIO $ do
     Just flagmap -> return $ flagmap ! fName
     Nothing -> error $ "Flag " ++ fName ++ " (from module: " ++ fModuleName ++ ") used before calling initHFlags."
 
+-- | Lisp like alist, key -> value pairs.
+type AList = [(String, String)]
+
+-- | A function that gets three alists and returns a new one.
+type DependentDefaults = AList -> AList -> AList -> AList
+
 -- | Initializes @globalHFlags@ and returns the non-option arguments.
-initFlags :: String -> [FlagData] -> [String] -> IO [String]
-initFlags progDescription flags args = do
+initFlags :: DependentDefaults -> String -> [FlagData] -> [String] -> IO [String]
+initFlags dependentDefaults progDescription flags args = do
   doHelp
   let (opts, nonopts, errs) | doUndefok = (\(a,b,_,c) -> (a,b,c)) $ getOpt' Permute getOptFlags args
                             | otherwise = getOpt Permute getOptFlags args
@@ -293,7 +305,8 @@ initFlags progDescription flags args = do
   let defaults = map (\FlagData { fName, fDefValue } -> (fName, fDefValue)) flags
   env <- getEnvironment
   let envDefaults = map (mapFst (fromJust . stripPrefix "HFLAGS_")) $ filter ((isPrefixOf "HFLAGS_") . fst) env
-  writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ envDefaults ++ opts
+  let depdef = dependentDefaults defaults envDefaults opts
+  writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ depdef ++ envDefaults ++ opts
   writeIORef globalArguments $ Just nonopts
   mapM_ forceFlag flags
   return nonopts
@@ -326,27 +339,16 @@ initFlags progDescription flags args = do
                ", value: " ++ lookupFlag fName fModuleName ++
                ", error: " ++ show (e :: ErrorCall))
 
--- | Has to be called from the main before doing anything else:
---
--- @
--- main = do args <- $(initHFlags "Simple program v0.1")
---           ...
--- @
---
--- Internally, it uses Template Haskell trickery to gather all the
--- instances of the Flag class and then generates a call to
--- @initFlags@ with the appropriate data gathered together from those
--- instances to a list.
---
--- Type after splicing is @IO [String]@.
-initHFlags :: String -> ExpQ -- IO [String]
-initHFlags progDescription = do
+-- | Gathers all the flag data from every module that is in (transitive) scope.
+-- Type after splicing: @[FlagData]@.
+getFlagsData :: ExpQ -- [FlagData]
+getFlagsData = do
   ClassI _ instances <- reify ''Flag
   case dupes instances of
     [] -> return ()
     (dupe:_) -> fail ("Multiple definition of flag " ++ (snd $ head dupe) ++
                        ", modules: " ++ (show $ map fst dupe))
-  [| getArgs >>= initFlags progDescription $(listE $ map instanceToFlagData instances ) |]
+  listE $ map instanceToFlagData instances
     where
       instanceToFlagData (InstanceD _ (AppT _ inst) _) = [| getFlagData (undefined :: $(return inst)) |]
       instanceToFlagData _ = error "Shouldn't happen"
@@ -364,3 +366,50 @@ initHFlags progDescription = do
                         groupBy ((==) `on` snd) $
                         sortBy (compare `on` snd) $
                         map instanceToModuleNamePair instances
+
+-- | Same as initHFlags, but makes it possible to introduce
+-- programmatic defaults based on user supplied flag values.
+--
+-- The second parameter has to be a function that gets the following
+-- alists:
+--
+--   * defaults,
+--
+--   * values from HFLAGS_* environment variables,
+--
+--   * command line options.
+--
+-- Has to return an alist that contains the additional defaults that
+-- will override the default flag values (but not the user supplied
+-- values: environment or command line).
+--
+-- Type after splicing is @String -> DependentDefaults -> IO [String]@.
+-- Where:
+--
+--   * @type AList = [(String, String)]@
+--
+--   * @type DependentDefaults = AList -> AList -> AList -> AList@
+initHFlagsDependentDefaults :: ExpQ -- (String -> DependentDefaults -> IO [String])
+initHFlagsDependentDefaults = do
+  [| \progDescription depDefaults ->
+        getArgs >>= initFlags depDefaults progDescription $getFlagsData |]
+
+-- | Has to be called from the main before doing anything else:
+--
+-- @
+-- main = do args <- $initHFlags "Simple program v0.1"
+--           ...
+-- @
+--
+-- /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
+--
+-- Internally, it uses Template Haskell trickery to gather all the
+-- instances of the Flag class and then generates a call to
+-- @initFlags@ with the appropriate data gathered together from those
+-- instances to a list.
+--
+-- Type after splicing is @String -> IO [String]@.
+initHFlags :: ExpQ -- (String -> IO [String])
+initHFlags = do
+  [| \progDescription ->
+        getArgs >>= initFlags (const $ const $ const []) progDescription $getFlagsData |]
