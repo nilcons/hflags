@@ -57,6 +57,13 @@ description:
   long options and the user has to specify a value even for Bools.
   .
   /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
+  .
+  Changes in version 0.2
+  .
+  * API change: the caller mustn't use parantheses around @initHFlags@
+  .
+  * New feature: dependent defaults, ability to compute some flags'
+    default values based on the current values of other flags
 
 extra-source-files:
   examples/ComplexExample.hs
