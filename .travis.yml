@@ -1,0 +1,5 @@
+language: haskell
+install:
+  - bash ./.travis.run
+script:
+  - . /opt/ceh/scripts/ceh-profile.sh ; cabal configure --user && cabal build && cabal install
