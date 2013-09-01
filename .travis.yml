@@ -1,3 +1,6 @@
 language: c
-install: bash ./.travis.run
-script: . /opt/ceh/scripts/ceh-profile.sh ; cabal configure --user && cabal build && cabal install
+install: bash ./.travis.ceh
+script: bash ./.travis.main
+env:
+  - CEH_GHC64=
+  - CEH_GHC64=1

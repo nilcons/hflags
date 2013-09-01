@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+set -x
+
+. /opt/ceh/scripts/ceh-profile.sh
+
+cabal update
+cabal install --only-dependencies
+cabal configure --user --enable-tests
+cabal build
+cabal test
