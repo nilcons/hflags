@@ -22,8 +22,8 @@ description:
   the toplevel @flags_name@ constants.  Those can be used purely
   throughout the program.
   .
-  At the beginning of the @main@ function, @$initHFlags "program
-  description"@ has to be called to initialize the flags.  All flags
+  At the beginning of the @main@ function, @$initHFlags \"program
+  description\"@ has to be called to initialize the flags.  All flags
   will be initialized that are transitively reachable via imports from
   @main@.  This means, that any Haskell package can easily define
   command line flags with @HFlags@.  This feature is demonstrated by
@@ -62,7 +62,7 @@ description:
   .
   * Added @undefinedOptions@
   .
-  * Added support for Char
+  * Added support for @Char@
   .
   Changes in version 0.2
   .

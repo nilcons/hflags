@@ -34,8 +34,8 @@
 -- the toplevel @flags_name@ constants.  Those can be used purely
 -- throughout the program.
 --
--- At the beginning of the @main@ function, @$initHFlags "program
--- description"@ has to be called to initialize the flags.  All flags
+-- At the beginning of the @main@ function, @$'initHFlags' \"program
+-- description\"@ has to be called to initialize the flags.  All flags
 -- will be initialized that are transitively reachable via imports
 -- from @main@.  This means, that any Haskell package can easily
 -- define command line flags with @HFlags@.  This feature is
@@ -62,10 +62,11 @@
 -- >   where
 -- >     greet = putStrLn $ "Hello " ++ flags_name ++ ", very nice to meet you!"
 --
--- At @initHFlags@ time, the library also tries to gather flags out of
+-- At 'initHFlags' time, the library also tries to gather flags out of
 -- environment variables.  @HFLAGS_verbose=True@ is equivalent to
--- specify --verbose=True.  This environment feature only works with
--- long options and the user has to specify a value even for Bools.
+-- specifying @--verbose=True@ on the command line.  This environment
+-- feature only works with long options and the user has to specify a
+-- value even for @Bool@s.
 --
 -- /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
 
@@ -123,7 +124,7 @@ data FlagData = FlagData
             , fArgType :: String
             , fDescription :: String
             , fModuleName :: String
-            , fCheck :: IO () -- ^ function to evaluate in 'initFlags'
+            , fCheck :: IO () -- ^ function to evaluate in @initFlags@
                               -- to force syntax check of the argument.
             }
 
@@ -274,19 +275,19 @@ instance FlagType Data.Text.Text where
     let s = Data.Text.unpack v
     in defineCustomFlag n [| Data.Text.pack s :: Data.Text.Text |] "TEXT" [| Data.Text.pack |] [| Data.Text.unpack |]
 
--- | A global "IORef" for the communication between @initHFlags@ and
+-- | A global 'IORef' for the communication between 'initHFlags' and
 -- @flags_*@.  This is a map between flag name and current value.
 {-# NOINLINE globalHFlags #-}
 globalHFlags :: IORef (Maybe (Map String String))
 globalHFlags = unsafePerformIO $ newIORef Nothing
 
--- | A global "IORef" for the easy access to the arguments.
+-- | A global 'IORef' for the easy access to the arguments.
 {-# NOINLINE globalArguments #-}
 globalArguments :: IORef (Maybe [String])
 globalArguments = unsafePerformIO $ newIORef Nothing
 
 -- | Contains the non-parsed, non-option parts of the command line,
--- the arguments.  Can only be used after @initHFlags@ has been called.
+-- the arguments.  Can only be used after 'initHFlags' has been called.
 {-# NOINLINE arguments #-}
 arguments :: [String]
 arguments = unsafePerformIO $ do
@@ -295,17 +296,17 @@ arguments = unsafePerformIO $ do
     Just args -> return $ args
     Nothing -> error $ "HFlags.arguments used before calling initHFlags."
 
--- | A global "IORef" for the easy access to the undefined options, if
--- "--undefok" is used.  Useful, if you have to pass these options to
--- another library, e.g. "criterion" or "GTK".
+-- | A global 'IORef' for the easy access to the undefined options, if
+-- @--undefok@ is used.  Useful, if you have to pass these options to
+-- another library, e.g. @criterion@ or @GTK@.
 {-# NOINLINE globalUndefinedOptions #-}
 globalUndefinedOptions :: IORef (Maybe [String])
 globalUndefinedOptions = unsafePerformIO $ newIORef Nothing
 
 -- | Contains the non-parsed, option parts of the command line, if
--- "--undefok" is in use.  This can be useful, when you have to pass
--- these options to other libraries, e.g. "criterion" or "GTK".  Can
--- only be used after @initHFlags@ has been called.
+-- @--undefok@ is in use.  This can be useful, when you have to pass
+-- these options to other libraries, e.g. @criterion@ or @GTK@.  Can
+-- only be used after 'initHFlags' has been called.
 {-# NOINLINE undefinedOptions #-}
 undefinedOptions :: [String]
 undefinedOptions = unsafePerformIO $ do
@@ -327,7 +328,7 @@ type AList = [(String, String)]
 -- | A function that gets three alists and returns a new one.
 type DependentDefaults = AList -> AList -> AList -> AList
 
--- | Initializes @globalHFlags@ and returns the non-option arguments.
+-- | Initializes 'globalHFlags' and returns the non-option arguments.
 initFlags :: DependentDefaults -> String -> [FlagData] -> [String] -> IO [String]
 initFlags dependentDefaults progDescription flags args = do
   doHelp
@@ -434,10 +435,8 @@ initHFlagsDependentDefaults = do
 
 -- | Has to be called from the main before doing anything else:
 --
--- @
--- main = do args <- $initHFlags "Simple program v0.1"
---           ...
--- @
+-- > main = do args <- $initHFlags "Simple program v0.1"
+-- >           ...
 --
 -- /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
 --
