@@ -1,5 +1,5 @@
 name: hflags
-version: 0.2
+version: 0.3
 license: OtherLicense
 license-file: COPYING
 author: Mihaly Barasz <klao@google.com>, Gergely Risko <gergely@risko.hu>
@@ -57,6 +57,12 @@ description:
   long options and the user has to specify a value even for Bools.
   .
   /Since version 0.2, you mustn't put the initHFlags in a parentheses with the program description.  Just/ @$initHFlags@, /it's cleaner./
+  .
+  Changes in version 0.3
+  .
+  * Added @undefinedOptions@
+  .
+  * Added support for Char
   .
   Changes in version 0.2
   .

@@ -80,10 +80,12 @@ module HFlags (
   initHFlagsDependentDefaults,
   -- * For easy access to arguments, after initHFlags has been called
   arguments,
+  undefinedOptions,
   -- * For debugging, shouldn't be used in production code
   Flag(..),
   globalHFlags,
-  globalArguments
+  globalArguments,
+  globalUndefinedOptions
   ) where
 
 -- TODOs:
@@ -242,6 +244,16 @@ boolRead = boolRead' . map toLower
 instance FlagType Bool where
   defineFlag n v = defineCustomFlag n [| v :: Bool |] "BOOL" [| boolRead |] [| boolShow |]
 
+charShow :: Char -> String
+charShow x = x:[]
+
+charRead :: String -> Char
+charRead [x] = x
+charRead s = error $ "Unable to parse string as char: " ++ s
+
+instance FlagType Char where
+  defineFlag n v = defineCustomFlag n [| v :: Char |] "CHAR" [| charRead |] [| charShow |]
+
 instance FlagType Int where
   defineFlag n v = defineEQFlag n [| v :: Int |] "INT"
 
@@ -283,6 +295,25 @@ arguments = unsafePerformIO $ do
     Just args -> return $ args
     Nothing -> error $ "HFlags.arguments used before calling initHFlags."
 
+-- | A global "IORef" for the easy access to the undefined options, if
+-- "--undefok" is used.  Useful, if you have to pass these options to
+-- another library, e.g. "criterion" or "GTK".
+{-# NOINLINE globalUndefinedOptions #-}
+globalUndefinedOptions :: IORef (Maybe [String])
+globalUndefinedOptions = unsafePerformIO $ newIORef Nothing
+
+-- | Contains the non-parsed, option parts of the command line, if
+-- "--undefok" is in use.  This can be useful, when you have to pass
+-- these options to other libraries, e.g. "criterion" or "GTK".  Can
+-- only be used after @initHFlags@ has been called.
+{-# NOINLINE undefinedOptions #-}
+undefinedOptions :: [String]
+undefinedOptions = unsafePerformIO $ do
+  margs <- readIORef globalUndefinedOptions
+  case margs of
+    Just args -> return $ args
+    Nothing -> error $ "HFlags.globalUndefOpts used before calling initHFlags."
+
 lookupFlag :: String -> String -> String
 lookupFlag fName fModuleName = unsafePerformIO $ do
   flags <- readIORef globalHFlags
@@ -300,8 +331,9 @@ type DependentDefaults = AList -> AList -> AList -> AList
 initFlags :: DependentDefaults -> String -> [FlagData] -> [String] -> IO [String]
 initFlags dependentDefaults progDescription flags args = do
   doHelp
-  let (opts, nonopts, errs) | doUndefok = (\(a,b,_,c) -> (a,b,c)) $ getOpt' Permute getOptFlags args
-                            | otherwise = getOpt Permute getOptFlags args
+  let (opts, nonopts, undefopts, errs)
+        | doUndefok = getOpt' Permute getOptFlags args
+        | otherwise = (\(a,b,c) -> (a,b,[],c)) $ getOpt Permute getOptFlags args
   when (not $ null errs) $ do
     mapM_ (hPutStrLn stderr) errs
     exitFailure
@@ -311,6 +343,7 @@ initFlags dependentDefaults progDescription flags args = do
   let depdef = dependentDefaults defaults envDefaults opts
   writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ depdef ++ envDefaults ++ opts
   writeIORef globalArguments $ Just nonopts
+  writeIORef globalUndefinedOptions $ Just undefopts
   mapM_ forceFlag flags
   return nonopts
     where
@@ -318,7 +351,7 @@ initFlags dependentDefaults progDescription flags args = do
       helpOption = Option "h" ["help", "usage", "version"] (NoArg ("", "")) "Display help and version information."
       doHelp = case getOpt Permute [helpOption] args of
         ([], _, _) -> return ()
-        _ -> do putStrLn $ usageInfo (progDescription ++ "\n") (helpOption:undefokOption:getOptFlags)
+        _ -> do putStrLn $ usageInfo (progDescription ++ "\n") (helpOption:getOptFlags)
                 exitFailure
 
       undefokOption = Option "" ["undefok"] (NoArg ("", "")) "Whether to fail on unrecognized command line options."
@@ -331,9 +364,11 @@ initFlags dependentDefaults progDescription flags args = do
         | otherwise = ReqArg (\a -> (fName, a)) fArgType
 
       -- compute GetOpt compatible [Option] structure from flags ([FlagData])
-      getOptFlags = flip map flags $ \flagData@(FlagData { fName, fShort, fDefValue, fDescription, fModuleName }) ->
-        Option (maybeToList fShort) [fName] (flagToGetOptArgDescr flagData)
-               (fDescription ++ " (default: " ++ fDefValue ++ ", from module: " ++ fModuleName ++ ")")
+      getOptFlags = undefokOption:
+        (flip map flags $ \flagData@(FlagData { fName, fShort, fDefValue, fDescription, fModuleName }) ->
+         Option (maybeToList fShort) [fName]
+                (flagToGetOptArgDescr flagData)
+                (fDescription ++ " (default: " ++ fDefValue ++ ", from module: " ++ fModuleName ++ ")"))
 
       forceFlag FlagData { fName, fModuleName, fCheck } =
         fCheck `catch`
