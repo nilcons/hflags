@@ -84,6 +84,7 @@ module HFlags (
   undefinedOptions,
   -- * For debugging, shouldn't be used in production code
   Flag(..),
+  MakeThisOrphan(..),
   globalHFlags,
   globalArguments,
   globalUndefinedOptions
@@ -105,7 +106,7 @@ import Data.Maybe
 -- evaluated if they are needed.  (The user hasn't specified the
 -- option in the command line or via environment variables.)
 import qualified Data.Map.Lazy as Map
-import Data.Map.Lazy (Map, (!))
+import Data.Map.Lazy (Map)
 import qualified Data.Text
 import Language.Haskell.TH
 import System.Console.GetOpt
@@ -115,6 +116,14 @@ import System.IO.Unsafe
 import System.Exit
 
 import Prelude
+
+-- | This is a temporary hack to force visibility of flags inside
+-- libraries, by making the module that defines the flag orphan.  For
+-- usage example, check out
+-- <http://github.com/errge/hflags/blob/master/examples/package/Tup.hs>.
+-- A proper fix is already proposed for GHC 7.8, see
+-- <http://ghc.haskell.org/trac/ghc/ticket/7867>.
+data MakeThisOrphan = MakeThisOrphan
 
 -- | Data type for storing every property of a flag.
 data FlagData = FlagData
@@ -189,7 +198,8 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
                                               argHelp
                                               description
                                               moduleName
-                                              (evaluate $(varE accessorName) >> return ())
+                                              -- seq'ng the constructor name, so it's not unused in the generated code
+                                              ($(conE dataConstrName) `seq` evaluate $(varE accessorName) >> return ())
                                            |]) []]]
      flagPragmaDec <- pragInlD accessorName NoInline FunLike AllPhases
      flagSig <- sigD accessorName flagType
@@ -319,7 +329,9 @@ lookupFlag :: String -> String -> String
 lookupFlag fName fModuleName = unsafePerformIO $ do
   flags <- readIORef globalHFlags
   case flags of
-    Just flagmap -> return $ flagmap ! fName
+    Just flagmap -> case Map.lookup fName flagmap of
+      Just v -> return v
+      Nothing -> error $ "Flag " ++ fName ++ " not found at runtime, look into HFlags-source/examples/package/Tup.hs.  Sorry."
     Nothing -> error $ "Flag " ++ fName ++ " (from module: " ++ fModuleName ++ ") used before calling initHFlags."
 
 -- | Lisp like alist, key -> value pairs.
