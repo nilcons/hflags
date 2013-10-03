@@ -15,5 +15,7 @@ library
     , template-haskell >= 2.8
     , hflags >= 0.1
 
+  ghc-options: -Wall
   exposed-modules:
-    Tup
+    Tup,
+    TupMain

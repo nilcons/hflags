@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import HFlags
-import Tup
+import TupMain
 
 main = do
   $initHFlags "foobar"
