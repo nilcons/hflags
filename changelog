@@ -1,0 +1,20 @@
+-*-change-log-*-
+
+0.5 (current development version)
+
+0.4 Gergely Risko <gergely@risko.hu> 2013-10-03
+        * Add changelog file
+        * Add documentation, test and temporary fix for orphanness issue
+        * Fix HFlagC unused warnings in generated code
+
+0.3 Gergely Risko <gergely@risko.hu>
+        * Add undefindeOptions
+        * Add Char support as flag value
+
+0.2 Gergely Risko <gergely@risko.hu>
+        * API change: the caller mustn't use parantheses around @initHFlags@
+        * New feature: dependent defaults, ability to compute some flags'
+          default values based on the current values of other flags
+
+0.1 Gergely Risko <gergely@risko.hu>
+        * Initial release
