@@ -20,6 +20,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- Module: HFlags
@@ -76,6 +77,10 @@ module HFlags (
   defineCustomFlag,
   defineEQFlag,
   FlagType(..),
+  FlagDescription,
+  flag,
+  short,
+  env,
   -- * Initialization of flags at runtime
   initHFlags,
   initHFlagsDependentDefaults,
@@ -102,6 +107,7 @@ import Data.Function
 import Data.List
 import Data.IORef
 import Data.Maybe
+import Data.String
 -- This is intentionally lazy, so dependent defaults are only
 -- evaluated if they are needed.  (The user hasn't specified the
 -- option in the command line or via environment variables.)
@@ -129,6 +135,7 @@ data MakeThisOrphan = MakeThisOrphan
 data FlagData = FlagData
             { fName :: String
             , fShort :: Maybe Char
+	    , fEnvironment :: Maybe String
             , fDefValue :: String
             , fArgType :: String
             , fDescription :: String
@@ -138,7 +145,7 @@ data FlagData = FlagData
             }
 
 instance Show FlagData where
-  show fd = show (fName fd, fShort fd, fDefValue fd, fArgType fd, fDescription fd, fModuleName fd)
+  show fd = show (fName fd, fShort fd, fEnvironment fd, fDefValue fd, fArgType fd, fDescription fd, fModuleName fd)
 
 -- | Every flag the program supports has to be defined through a new
 -- phantom datatype and the Flag instance of that datatype.
@@ -148,6 +155,33 @@ instance Show FlagData where
 -- @defineFlag@ Template Haskell function for defining new flags.
 class Flag a where
   getFlagData :: a -> FlagData
+
+-- Description of the flag and a ways how it can be defined, can
+-- be created either using OverloadedStrings interface, where
+-- you pass a string in the @l:long@ format.
+--
+-- Or by using combinators:
+--
+-- @flag name `short` 'c' `env` "APP_TEST"@
+data FlagDescription = FlagDescription String (Maybe Char) (Maybe String)
+
+flag :: String -> FlagDescription
+flag x = FlagDescription x Nothing Nothing
+
+short :: FlagDescription -> Char -> FlagDescription
+short (FlagDescription n _ e) s = FlagDescription n (Just s) e
+
+env :: FlagDescription -> String -> FlagDescription
+env (FlagDescription n s _) e = FlagDescription n s (Just e)
+
+instance IsString FlagDescription where
+  fromString str
+     | length str == 0 = error "Flag's without names are not supported."
+     | length str == 1 = FlagDescription str (Just $ head str) Nothing
+     | length str == 2 = FlagDescription str Nothing Nothing
+     | str !! 1 == ':' = FlagDescription (drop 2 str) (Just $ head str) Nothing
+     | otherwise       = FlagDescription str Nothing Nothing
+
 
 -- | The most flexible way of defining a flag.  For an example see
 -- <http://github.com/errge/hflags/blob/master/examples/ComplexExample.hs>.
@@ -166,14 +200,11 @@ class Flag a where
 --   * show function, expression quoted,
 --
 --   * help string for the flag.
-defineCustomFlag :: String -> ExpQ -> String -> ExpQ -> ExpQ -> String -> Q [Dec]
-defineCustomFlag name' defQ argHelp readQ showQ description =
-  do (name, short) <- if | length name' == 0 -> fail "Flag's without names are not supported."
-                         | length name' == 1 -> return (name', Just $ head name')
-                         | length name' == 2 -> return (name', Nothing)
-                         | name' !! 1 == ':' -> return (drop 2 name', Just $ head name')
-                         | otherwise -> return (name', Nothing)
-     defE <- defQ
+--
+-- To allow backward compatibility with version 0.2 you may enable @OverloadedStrings@ extension.
+defineCustomFlag :: FlagDescription -> ExpQ -> String -> ExpQ -> ExpQ -> String -> Q [Dec]
+defineCustomFlag (FlagDescription name short' env') defQ argHelp readQ showQ description =
+  do defE <- defQ
      flagType <- case defE of
        SigE _ flagType -> return $ return flagType
        _ -> fail "Default value for defineCustomFlag has to be an explicitly typed expression, like (12 :: Int)"
@@ -193,7 +224,8 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
                                           (normalB
                                            [| FlagData
                                               name
-                                              short
+                                              short'
+                                              env'
                                               $(appE showQ defQ)
                                               argHelp
                                               description
@@ -220,7 +252,7 @@ defineCustomFlag name' defQ argHelp readQ showQ description =
 --   * help string identifying the type of the argument (e.g. INTLIST),
 --
 --   * help string for the flag.
-defineEQFlag :: String -> ExpQ -> String -> String -> Q [Dec]
+defineEQFlag :: FlagDescription -> ExpQ -> String -> String -> Q [Dec]
 defineEQFlag name defQ argHelp description =
  defineCustomFlag name defQ argHelp [| read |] [| show |] description
 
@@ -235,7 +267,7 @@ class FlagType t where
   --   * default value,
   --
   --   * help string for the flag.
-  defineFlag :: String -> t -> String -> Q [Dec]
+  defineFlag :: FlagDescription -> t -> String -> Q [Dec]
 
 boolShow :: Bool -> String
 boolShow True = "true"
@@ -343,6 +375,7 @@ type DependentDefaults = AList -> AList -> AList -> AList
 -- | Initializes 'globalHFlags' and returns the non-option arguments.
 initFlags :: DependentDefaults -> String -> [FlagData] -> [String] -> IO [String]
 initFlags dependentDefaults progDescription flags args = do
+  print flags
   doHelp
   let (opts, nonopts, undefopts, errs)
         | doUndefok = getOpt' Permute getOptFlags args
@@ -351,10 +384,11 @@ initFlags dependentDefaults progDescription flags args = do
     mapM_ (hPutStrLn stderr) errs
     exitFailure
   let defaults = map (\FlagData { fName, fDefValue } -> (fName, fDefValue)) flags
-  env <- getEnvironment
-  let envDefaults = map (mapFst (fromJust . stripPrefix "HFLAGS_")) $ filter ((isPrefixOf "HFLAGS_") . fst) env
+  env' <- getEnvironment
+  let envDefaults = map (mapFst (fromJust . stripPrefix "HFLAGS_")) $ filter ((isPrefixOf "HFLAGS_") . fst) env'
+  let envOther = mapMaybe (\FlagData{fName, fEnvironment} -> fEnvironment >>= \v -> fmap (fName,) (lookup v env')) flags
   let depdef = dependentDefaults defaults envDefaults opts
-  writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ depdef ++ envDefaults ++ opts
+  writeIORef globalHFlags $ Just $ Map.fromList $ defaults ++ depdef ++ envDefaults ++ envOther ++ opts
   writeIORef globalArguments $ Just nonopts
   writeIORef globalUndefinedOptions $ Just undefopts
   mapM_ forceFlag flags
@@ -410,8 +444,8 @@ getFlagsData = do
       instanceToModuleNamePair (InstanceD _ (AppT _ (ConT inst)) _) =
         let (flagrev, modrev) = span (/= '.') $ reverse $ show inst
             modName = reverse $ drop 1 modrev
-            flag = drop 1 $ dropWhile (/= '_') $ reverse $ flagrev
-        in (modName, flag)
+            flag' = drop 1 $ dropWhile (/= '_') $ reverse $ flagrev
+        in (modName, flag')
       instanceToModuleNamePair _ = error "Shouldn't happen"
       dupes instances = filter ((>1) . length) $
                         groupBy ((==) `on` snd) $
