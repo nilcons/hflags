@@ -9,6 +9,7 @@
 language: c
 install: bash ./.travis.ceh
 script: bash ./.travis.main
+sudo: required
 env:
   - CEH_GHC64=
   - CEH_GHC64=1
