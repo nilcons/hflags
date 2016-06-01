@@ -14,7 +14,7 @@
 -- limitations under the License.
 --
 -- Authors: Mihaly Barasz <klao@google.com>, Gergely Risko <gergely@risko.hu>
-
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -406,13 +406,13 @@ getFlagsData = do
                        ", modules: " ++ (show $ map fst dupe))
   listE $ map instanceToFlagData instances
     where
-      instanceToFlagData (InstanceD _ (AppT _ inst) _) = [| getFlagData (undefined :: $(return inst)) |]
+      instanceToFlagData (getInstanceType -> (AppT _ inst)) = [| getFlagData (undefined :: $(return inst)) |]
       instanceToFlagData _ = error "Shouldn't happen"
       -- Duplicate checking is based on the generated `data HFlag_...'
       -- names, and not on FlagData, because we want to do the checks
       -- at compile time.  It's not possible in TH, to run getFlagData
       -- on the just reified instances.
-      instanceToModuleNamePair (InstanceD _ (AppT _ (ConT inst)) _) =
+      instanceToModuleNamePair (getInstanceType -> AppT _ (ConT inst)) =
         let (flagrev, modrev) = span (/= '.') $ reverse $ show inst
             modName = reverse $ drop 1 modrev
             flag = drop 1 $ dropWhile (/= '_') $ reverse $ flagrev
@@ -422,6 +422,13 @@ getFlagsData = do
                         groupBy ((==) `on` snd) $
                         sortBy (compare `on` snd) $
                         map instanceToModuleNamePair instances
+#if MIN_VERSION_template_haskell(2,11,0)
+getInstanceType :: Dec -> Type
+getInstanceType (InstanceD _ _ ty _) = ty
+#else
+getInstanceType (InstanceD   _ ty _) = ty
+#endif
+getInstanceType _                  = error "Shouldn't happen"
 
 -- | Same as initHFlags, but makes it possible to introduce
 -- programmatic defaults based on user supplied flag values.
