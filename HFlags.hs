@@ -422,8 +422,9 @@ getFlagsData = do
                         groupBy ((==) `on` snd) $
                         sortBy (compare `on` snd) $
                         map instanceToModuleNamePair instances
-#if MIN_VERSION_template_haskell(2,11,0)
+
 getInstanceType :: Dec -> Type
+#if MIN_VERSION_template_haskell(2,11,0)
 getInstanceType (InstanceD _ _ ty _) = ty
 #else
 getInstanceType (InstanceD   _ ty _) = ty
