@@ -1,6 +1,6 @@
 #!/usr/bin/env runhaskell
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 
 import Control.Monad
 import System.Exit
@@ -10,7 +10,8 @@ import HFlags
 -- For flags with a simple type (technically speaking, for instances
 -- of FlagType, see `:info FlagType' in GHCi), defining a new flag is
 -- very straightforward:
-defineFlag "name" "Indiana Jones" "Who to greet."
+defineFlag "name" ("Indiana Jones"::String) "Who to greet."
+
 -- There is a special syntax to support short options, like `d' here.
 -- Also, for the Bool options the argument is not mandatory, if the
 -- user just runs the program with -d or --dry_run, flags_dru_run will
@@ -57,11 +58,16 @@ defineCustomFlag "percent" [| 100 :: Double |] "PERCENTAGE"
   [| show |]
   "Print first percent percentage of the message."
 
+-- You can use combinators syntax and pass enviornment option.
+defineFlag (flag "etest" `env` "APP_ENVTEST") ("TEST"::String) "pass value from environment"
+$(return [])
+
 main = do
   _ <- $initHFlags "HFlags example program v0.1"
   when (flags_dry_run) $ exitSuccess
   forM_ [1..flags_repeat] (const greet)
   putStrLn $ "IIRC, your favorite color is " ++ show flags_favorite_color ++ "."
+  putStrLn $ "And enviroment says " ++ flags_etest ++ "."
   where
     s = show (sum flags_numbers_to_sum)
     percentPutStrLn 0 _ = return ()
